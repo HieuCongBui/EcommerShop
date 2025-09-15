@@ -129,6 +129,26 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore();
     });
 
+// Add Razor Pages support for frontend with antiforgery protection
+builder.Services.AddRazorPages(options =>
+{
+    options.Conventions.AllowAnonymousToPage("/Views/Account/Login");
+    options.Conventions.AllowAnonymousToPage("/Views/Account/Consent");
+    options.Conventions.AllowAnonymousToPage("/Views/Account/Logout");
+    options.Conventions.AllowAnonymousToPage("/Views/Account/Error");
+});
+
+// Configure Antiforgery with enhanced security
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.SuppressXFrameOptionsHeader = false;
+    options.Cookie.Name = "__RequestVerificationToken";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+});
+
 builder.Services.AddControllers();
 
 // Configure Swagger with OAuth2 support
@@ -200,9 +220,89 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+// Configure static files for frontend resources
+app.UseStaticFiles();
+
+// Configure security headers
+app.Use(async (context, next) =>
+{
+    // Add security headers
+    context.Response.Headers.Add("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Add("X-Frame-Options", "DENY");
+    context.Response.Headers.Add("X-XSS-Protection", "1; mode=block");
+    context.Response.Headers.Add("Referrer-Policy", "strict-origin-when-cross-origin");
+    
+    // Add Content Security Policy
+    var csp = "default-src 'self'; " +
+              "script-src 'self' 'unsafe-inline'; " +
+              "style-src 'self' 'unsafe-inline'; " +
+              "img-src 'self' data:; " +
+              "font-src 'self'; " +
+              "connect-src 'self'; " +
+              "frame-ancestors 'none';";
+    context.Response.Headers.Add("Content-Security-Policy", csp);
+
+    await next();
+});
+
+// Configure Identity cookie authentication
+app.UseCookiePolicy(new CookiePolicyOptions
+{
+    MinimumSameSitePolicy = SameSiteMode.Lax,
+    Secure = CookieSecurePolicy.SameAsRequest,
+    HttpOnly = Microsoft.AspNetCore.CookiePolicy.HttpOnlyPolicy.Always
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Configure routing for frontend pages
+app.MapGet("/login", async context =>
+{
+    var returnUrl = context.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrEmpty(returnUrl))
+    {
+        returnUrl = "/";
+    }
+    context.Response.Redirect($"/Views/Account/Login?returnUrl={Uri.EscapeDataString(returnUrl)}");
+});
+
+app.MapGet("/consent", async context =>
+{
+    var returnUrl = context.Request.Query["returnUrl"].ToString();
+    if (string.IsNullOrEmpty(returnUrl))
+    {
+        context.Response.StatusCode = 400;
+        await context.Response.WriteAsync("Missing returnUrl parameter");
+        return;
+    }
+    context.Response.Redirect($"/Views/Account/Consent?returnUrl={Uri.EscapeDataString(returnUrl)}");
+});
+
+app.MapGet("/logout", async context =>
+{
+    var logoutId = context.Request.Query["logoutId"].ToString();
+    var postLogoutRedirectUri = context.Request.Query["post_logout_redirect_uri"].ToString();
+    
+    var queryParams = new List<string>();
+    if (!string.IsNullOrEmpty(logoutId))
+        queryParams.Add($"logoutId={Uri.EscapeDataString(logoutId)}");
+    if (!string.IsNullOrEmpty(postLogoutRedirectUri))
+        queryParams.Add($"post_logout_redirect_uri={Uri.EscapeDataString(postLogoutRedirectUri)}");
+    
+    var queryString = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
+    context.Response.Redirect($"/Views/Account/Logout{queryString}");
+});
+
+// Default OAuth2 endpoints redirect to login pages when accessed directly
+// app.MapGet("/connect/authorize", async context =>
+// {
+//     // For GET requests to authorize endpoint, redirect to login page with all query parameters
+//     var queryString = context.Request.QueryString.HasValue ? context.Request.QueryString.Value : "";
+//     context.Response.Redirect($"/login{queryString}");
+// });
+
+app.MapRazorPages();
 app.MapControllers();
 
 app.Run();

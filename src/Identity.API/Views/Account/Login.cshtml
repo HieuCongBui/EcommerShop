@@ -1,0 +1,145 @@
+@page "/Views/Account/Login"
+@model Identity.API.Views.Account.LoginModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign In - Identity Server</title>
+    <link rel="stylesheet" href="~/Views/Shared/styles.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">
+                <h1>Identity Server</h1>
+                <p>Secure Authentication Portal</p>
+            </div>
+
+            <form method="post" data-validate="true">
+                @Html.AntiForgeryToken()
+                <div id="main-content">
+                    <!-- Success Message -->
+                    @if (!string.IsNullOrEmpty(Model.SuccessMessage))
+                    {
+                        <div class="success-message" role="alert">
+                            @Model.SuccessMessage
+                        </div>
+                    }
+
+                    <!-- Error Message -->
+                    @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                    {
+                        <div class="error-message" role="alert">
+                            @Model.ErrorMessage
+                        </div>
+                    }
+
+                    <!-- Validation Summary -->
+                    <div asp-validation-summary="ModelOnly" class="error-message" role="alert"></div>
+
+                    <!-- Email/Username Field -->
+                    <div class="form-group">
+                        <label asp-for="Input.Email">Email or Username</label>
+                        <input asp-for="Input.Email" 
+                               class="form-control" 
+                               type="email" 
+                               placeholder="Enter your email or username"
+                               autocomplete="username"
+                               aria-describedby="emailHelp"
+                               autofocus />
+                        <span asp-validation-for="Input.Email" class="error-message"></span>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="form-group">
+                        <label asp-for="Input.Password">Password</label>
+                        <input asp-for="Input.Password" 
+                               class="form-control" 
+                               type="password" 
+                               placeholder="Enter your password"
+                               autocomplete="current-password"
+                               aria-describedby="passwordHelp" />
+                        <span asp-validation-for="Input.Password" class="error-message"></span>
+                    </div>
+
+                    <!-- Remember Me -->
+                    <div class="checkbox-group">
+                        <input asp-for="Input.RememberMe" type="checkbox" />
+                        <label asp-for="Input.RememberMe">Remember me</label>
+                    </div>
+
+                    <!-- Hidden Fields -->
+                    <input type="hidden" asp-for="ReturnUrl" value="@Model.ReturnUrl" />
+
+                    <!-- Login Button -->
+                    <div class="form-group">
+                        <button type="submit" class="btn btn-primary">
+                            Sign In
+                        </button>
+                    </div>
+
+                    <!-- Links -->
+                    <div class="links">
+                        <a href="/Views/Account/ForgotPassword">Forgot your password?</a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Client-side Scripts -->
+    <script src="~/Views/Shared/scripts.js"></script>
+    <script type="text/javascript">
+        // Page-specific JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-focus email field if empty
+            const emailField = document.querySelector('input[name="Input.Email"]');
+            if (emailField && !emailField.value) {
+                emailField.focus();
+            }
+
+            // Enhanced form validation
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const email = document.querySelector('input[name="Input.Email"]').value.trim();
+                    const password = document.querySelector('input[name="Input.Password"]').value;
+
+                    if (!email || !password) {
+                        e.preventDefault();
+                        return false;
+                    }
+
+                    // Show loading state
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Signing in...';
+                        submitBtn.classList.add('loading');
+                    }
+                });
+            }
+
+            // Hide error messages on input focus
+            const inputs = document.querySelectorAll('input[type="text"], input[type="email"], input[type="password"]');
+            inputs.forEach(function(input) {
+                input.addEventListener('focus', function() {
+                    const errorMessage = document.querySelector('.error-message');
+                    if (errorMessage) {
+                        errorMessage.style.display = 'none';
+                    }
+                });
+            });
+        });
+    </script>
+
+    @section Scripts {
+        @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+    }
+</body>
+</html>

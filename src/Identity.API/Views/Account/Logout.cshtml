@@ -1,0 +1,119 @@
+@page "/Views/Account/Logout"
+@model Identity.API.Views.Account.LogoutModel
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign Out - Identity Server</title>
+    <link rel="stylesheet" href="~/Views/Shared/styles.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">
+                <h1>Identity Server</h1>
+                <p>@(Model.LogoutData?.WasAuthenticated == true ? "Sign Out Confirmation" : "Signed Out")</p>
+            </div>
+
+            <div id="main-content">
+                @if (Model.LogoutData?.WasAuthenticated == true)
+                {
+                    <!-- Logout Confirmation -->
+                    <div class="consent-info">
+                        <h2>Sign Out</h2>
+                        @if (!string.IsNullOrEmpty(Model.LogoutData.UserDisplayName))
+                        {
+                            <p>You are currently signed in as <strong>@Model.LogoutData.UserDisplayName</strong>.</p>
+                        }
+                        <p>Would you like to sign out of your account?</p>
+                    </div>
+
+                    <form method="post" data-validate="true">
+                        <input type="hidden" asp-for="LogoutId" value="@Model.LogoutId" />
+                        <input type="hidden" asp-for="PostLogoutRedirectUri" value="@Model.PostLogoutRedirectUri" />
+
+                        <div class="button-group">
+                            <button type="submit" name="action" value="logout" class="btn btn-primary">
+                                Yes, Sign Out
+                            </button>
+                            <a href="@(Model.PostLogoutRedirectUri ?? "/")" class="btn btn-secondary">
+                                Cancel
+                            </a>
+                        </div>
+                    </form>
+                }
+                else
+                {
+                    <!-- Logout Complete -->
+                    <div class="success-message" role="alert">
+                        @(Model.LogoutData?.Message ?? "You have been successfully signed out.")
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.PostLogoutRedirectUri))
+                    {
+                        <div class="links">
+                            <a href="@Model.PostLogoutRedirectUri" class="btn btn-primary">
+                                Return to Application
+                            </a>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="links">
+                            <a href="/login" class="btn btn-primary">Sign In Again</a>
+                        </div>
+                    }
+                }
+
+                @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+                {
+                    <div class="error-message" role="alert">
+                        @Model.ErrorMessage
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Client-side Scripts -->
+    <script src="~/Views/Shared/scripts.js"></script>
+    <script type="text/javascript">
+        // Page-specific JavaScript
+        document.addEventListener('DOMContentLoaded', function() {
+            // Auto-redirect after logout if specified
+            const autoRedirect = @(Model.AutoRedirect ? "true" : "false");
+            const redirectUri = '@Html.Raw(Model.PostLogoutRedirectUri ?? "")';
+            
+            if (autoRedirect && redirectUri && !@(Model.LogoutData?.WasAuthenticated == true ? "true" : "false")) {
+                setTimeout(function() {
+                    window.location.href = redirectUri;
+                }, 3000); // Redirect after 3 seconds
+            }
+
+            // Show loading state on logout confirmation
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', function(e) {
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Signing out...';
+                        submitBtn.classList.add('loading');
+                    }
+                });
+            }
+
+            // Auto-focus logout button
+            const logoutButton = document.querySelector('button[value="logout"]');
+            if (logoutButton) {
+                logoutButton.focus();
+            }
+        });
+    </script>
+</body>
+</html>

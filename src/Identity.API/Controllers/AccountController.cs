@@ -74,7 +74,16 @@ public class AccountController(
             var emailConfirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var encodedToken = HttpUtility.UrlEncode(emailConfirmationToken);
             var baseUrl = _configuration["ApplicationSettings:BaseUrl"];
-            var confirmationLink = $"{baseUrl}/api/account/confirm-email?userId={user.Id}&token={encodedToken}";
+            
+            // Generate tracking token for initial registration
+            var trackingToken = Guid.NewGuid().ToString();
+            var confirmationLink = $"{baseUrl}/api/account/confirm-email?userId={user.Id}&token={encodedToken}&tracking={trackingToken}";
+
+            // Initialize tracking data
+            user.EmailConfirmationSentAt = DateTime.UtcNow;
+            user.EmailConfirmationAttempts = 1;
+            user.LastEmailConfirmationToken = trackingToken;
+            await _userManager.UpdateAsync(user);
 
             // Send confirmation email
             await _emailService.SendEmailConfirmationAsync(user.Email, confirmationLink);
@@ -173,10 +182,10 @@ public class AccountController(
     }
 
     /// <summary>
-    /// Confirm email address
+    /// Confirm email address with click tracking
     /// </summary>
     [HttpGet("confirm-email")]
-    public async Task<ActionResult<ApiResponse>> ConfirmEmail(string userId, string token)
+    public async Task<ActionResult<ApiResponse>> ConfirmEmail(string userId, string token, string? tracking = null)
     {
         try
         {
@@ -191,6 +200,17 @@ public class AccountController(
                 return BadRequest(ApiResponse.ErrorResult("User not found"));
             }
 
+            // Track the click
+            if (!string.IsNullOrEmpty(tracking))
+            {
+                user.EmailConfirmationClickedAt = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
+
+                // Log the click for analytics
+                _logger.LogInformation("Email confirmation link clicked by user {Email} with tracking {Tracking}", 
+                    user.Email, tracking);
+            }
+
             if (user.EmailConfirmed)
             {
                 return Ok(ApiResponse.SuccessResult("Email already confirmed"));
@@ -201,6 +221,10 @@ public class AccountController(
             
             if (result.Succeeded)
             {
+                // Update completion time
+                user.EmailConfirmationCompletedAt = DateTime.UtcNow;
+                await _userManager.UpdateAsync(user);
+
                 _logger.LogInformation("Email confirmed for user {Email}", user.Email);
                 return Ok(ApiResponse.SuccessResult("Email confirmed successfully. You can now log in."));
             }
@@ -403,7 +427,48 @@ public class AccountController(
     }
 
     /// <summary>
-    /// Resend email confirmation
+    /// Get email confirmation status with tracking details
+    /// </summary>
+    [HttpGet("email-confirmation-status")]
+    public async Task<ActionResult<ApiResponse<EmailConfirmationStatusDto>>> GetEmailConfirmationStatus(string email)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(email))
+            {
+                return BadRequest(ApiResponse<EmailConfirmationStatusDto>.ErrorResult("Email is required"));
+            }
+
+            var user = await _userManager.FindByEmailAsync(email);
+            if (user == null)
+            {
+                // Don't reveal that user doesn't exist
+                return Ok(ApiResponse<EmailConfirmationStatusDto>.SuccessResult(
+                    new EmailConfirmationStatusDto { IsConfirmed = false }, 
+                    "Email confirmation status retrieved"));
+            }
+
+            var status = new EmailConfirmationStatusDto
+            {
+                IsConfirmed = user.EmailConfirmed,
+                EmailSentAt = user.EmailConfirmationSentAt,
+                EmailClickedAt = user.EmailConfirmationClickedAt,
+                EmailConfirmedAt = user.EmailConfirmationCompletedAt,
+                AttemptCount = user.EmailConfirmationAttempts,
+                HasClickedLink = user.EmailConfirmationClickedAt.HasValue
+            };
+
+            return Ok(ApiResponse<EmailConfirmationStatusDto>.SuccessResult(status, "Email confirmation status retrieved"));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error occurred while checking email confirmation status");
+            return StatusCode(500, ApiResponse<EmailConfirmationStatusDto>.ErrorResult("Internal server error occurred"));
+        }
+    }
+
+    /// <summary>
+    /// Resend email confirmation with tracking
     /// </summary>
     [HttpPost("resend-confirmation")]
     public async Task<ActionResult<ApiResponse>> ResendEmailConfirmation([FromBody] ForgotPasswordDto model)
@@ -431,14 +496,31 @@ public class AccountController(
                 return BadRequest(ApiResponse.ErrorResult("Email is already confirmed"));
             }
 
+            // Check rate limiting - prevent too many resend attempts
+            if (user.EmailConfirmationSentAt.HasValue && 
+                user.EmailConfirmationSentAt.Value.AddMinutes(2) > DateTime.UtcNow)
+            {
+                return BadRequest(ApiResponse.ErrorResult("Please wait before requesting another confirmation email"));
+            }
+
             var emailConfirmationToken = await _userManager.GenerateEmailConfirmationTokenAsync(user);
             var encodedToken = HttpUtility.UrlEncode(emailConfirmationToken);
             var baseUrl = _configuration["ApplicationSettings:BaseUrl"];
-            var confirmationLink = $"{baseUrl}/api/account/confirm-email?userId={user.Id}&token={encodedToken}";
+            
+            // Generate tracking token
+            var trackingToken = Guid.NewGuid().ToString();
+            
+            var confirmationLink = $"{baseUrl}/api/account/confirm-email?userId={user.Id}&token={encodedToken}&tracking={trackingToken}";
+
+            // Update user tracking information
+            user.EmailConfirmationSentAt = DateTime.UtcNow;
+            user.EmailConfirmationAttempts++;
+            user.LastEmailConfirmationToken = trackingToken;
+            await _userManager.UpdateAsync(user);
 
             await _emailService.SendEmailConfirmationAsync(user.Email, confirmationLink);
 
-            _logger.LogInformation("Email confirmation resent to {Email}", user.Email);
+            _logger.LogInformation("Email confirmation resent to {Email}, attempt {Attempts}", user.Email, user.EmailConfirmationAttempts);
             return Ok(ApiResponse.SuccessResult("If the email exists, a confirmation email has been sent."));
         }
         catch (Exception ex)

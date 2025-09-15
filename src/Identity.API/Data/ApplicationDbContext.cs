@@ -23,6 +23,10 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             entity.Property(e => e.FirstName).HasMaxLength(100);
             entity.Property(e => e.LastName).HasMaxLength(100);
             entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+            
+            // Configure email confirmation tracking fields
+            entity.Property(e => e.LastEmailConfirmationToken).HasMaxLength(100);
+            entity.Property(e => e.EmailConfirmationAttempts).HasDefaultValue(0);
         });
 
         // Configure ApplicationRole

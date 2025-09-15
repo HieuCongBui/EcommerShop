@@ -47,12 +47,26 @@ public class AuthorizationController : ControllerBase
     }
 
     [HttpGet("authorize")]
-    [HttpPost("authorize")]
-    public async Task<IActionResult> Authorize()
+    public async Task<IActionResult> AuthorizeGet()
     {
         var request = HttpContext.GetOpenIddictServerRequest() ??
             throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+        return await ProcessAuthorizeRequest(request);
+    }
+
+    [HttpPost("authorize")]
+    [Consumes("application/x-www-form-urlencoded")]
+    public async Task<IActionResult> AuthorizePost()
+    {
+        var request = HttpContext.GetOpenIddictServerRequest() ??
+            throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        return await ProcessAuthorizeRequest(request);
+    }
+
+    private async Task<IActionResult> ProcessAuthorizeRequest(OpenIddictRequest request)
+    {
         try
         {
             // Retrieve the user principal stored in the authentication cookie
@@ -159,6 +173,7 @@ public class AuthorizationController : ControllerBase
 
     [HttpPost("consent")]
     [Authorize]
+    [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Consent([FromForm] ConsentDto model)
     {
         var request = HttpContext.GetOpenIddictServerRequest() ??
@@ -226,6 +241,7 @@ public class AuthorizationController : ControllerBase
     }
 
     [HttpPost("token")]
+    [Consumes("application/x-www-form-urlencoded")]
     public async Task<IActionResult> Exchange()
     {
         var request = HttpContext.GetOpenIddictServerRequest() ??
