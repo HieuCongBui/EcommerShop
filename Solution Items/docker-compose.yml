@@ -1,0 +1,217 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Identity Service
+  identity-db:
+    image: postgres:15-alpine
+    container_name: ecommershop-identity-db
+    environment:
+      POSTGRES_DB: IdentityDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Dev@123456
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - identity_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d IdentityDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL Database for Catalog Service
+  catalog-db:
+    image: postgres:15-alpine
+    container_name: ecommershop-catalog-db
+    environment:
+      POSTGRES_DB: CatalogDb
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Dev@123456
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5433:5432"
+    volumes:
+      - catalog_db_data:/var/lib/postgresql/data
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d CatalogDb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: ecommershop-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Identity API Service
+  identity-api:
+    build:
+      context: ./src/Identity.API
+      dockerfile: Dockerfile
+    container_name: ecommershop-identity-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__IdentityDb=Host=identity-db;Database=IdentityDb;Username=postgres;Password=Dev@123456
+      - Logging__LogLevel__Default=Information
+    ports:
+      - "5001:8080"
+    depends_on:
+      identity-db:
+        condition: service_healthy
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Catalog API Service
+  catalog-api:
+    build:
+      context: ./src/Catalog.API
+      dockerfile: Dockerfile
+    container_name: ecommershop-catalog-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__CatalogDb=Host=catalog-db;Database=CatalogDb;Username=postgres;Password=Dev@123456
+      - ConnectionStrings__Redis=redis:6379
+      - IdentityService__Authority=http://identity-api:8080
+      - Logging__LogLevel__Default=Information
+    ports:
+      - "5002:8080"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      identity-api:
+        condition: service_healthy
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Web Application (Frontend)
+  webapp:
+    build:
+      context: ./src/WebApp
+      dockerfile: Dockerfile
+    container_name: ecommershop-webapp
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - Services__IdentityApi=http://identity-api:8080
+      - Services__CatalogApi=http://catalog-api:8080
+      - Logging__LogLevel__Default=Information
+    ports:
+      - "5000:8080"
+    depends_on:
+      identity-api:
+        condition: service_healthy
+      catalog-api:
+        condition: service_healthy
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: ecommershop-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Solution Items/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./Solution Items/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - webapp
+      - identity-api
+      - catalog-api
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+
+  # pgAdmin for Database Management (Development only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: ecommershop-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@ecommershop.com
+      PGADMIN_DEFAULT_PASSWORD: Admin@123456
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - identity-db
+      - catalog-db
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+  # Redis Commander for Redis Management (Development only)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: ecommershop-redis-commander
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - ecommershop-network
+    restart: unless-stopped
+    profiles:
+      - dev
+
+volumes:
+  identity_db_data:
+    driver: local
+  catalog_db_data:
+    driver: local
+  redis_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  ecommershop-network:
+    driver: bridge
+    name: ecommershop-network

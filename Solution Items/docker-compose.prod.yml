@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # Production overrides for databases
+  identity-db:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/identity_db_password
+    secrets:
+      - identity_db_password
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  catalog-db:
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/catalog_db_password
+    secrets:
+      - catalog_db_password
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+
+  # Production overrides for Identity API
+  identity-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=https://+:8081;http://+:8080
+      - ConnectionStrings__IdentityDb=Host=identity-db;Database=IdentityDb;Username=postgres;Password_File=/run/secrets/identity_db_password
+    secrets:
+      - identity_db_password
+      - jwt_signing_key
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+
+  # Production overrides for Catalog API
+  catalog-api:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=https://+:8081;http://+:8080
+      - ConnectionStrings__CatalogDb=Host=catalog-db;Database=CatalogDb;Username=postgres;Password_File=/run/secrets/catalog_db_password
+    secrets:
+      - catalog_db_password
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+
+  # Production overrides for Web App
+  webapp:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=https://+:8081;http://+:8080
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      update_config:
+        parallelism: 1
+        delay: 10s
+
+  # Disable development tools in production
+  pgadmin:
+    profiles:
+      - donotstart
+
+  redis-commander:
+    profiles:
+      - donotstart
+
+secrets:
+  identity_db_password:
+    external: true
+  catalog_db_password:
+    external: true
+  jwt_signing_key:
+    external: true
