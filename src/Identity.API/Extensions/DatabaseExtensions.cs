@@ -47,7 +47,7 @@ public static class DatabaseExtensions
 
         foreach (var role in roles)
         {
-            if (!await roleManager.RoleExistsAsync(role.Name!))
+            if (!await roleManager.RoleExistsAsync(roleName: role.Name!))
             {
                 await roleManager.CreateAsync(role);
             }
