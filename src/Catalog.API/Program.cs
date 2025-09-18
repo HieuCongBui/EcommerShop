@@ -1,25 +1,18 @@
+using Catalog.API.Apis;
+using eServiceDefault;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
+builder.AddApplicationServices();
+var withApiVersioning = builder.Services.AddApiVersioning();
 
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.AddDefaultOpenApi(withApiVersioning);
 
 var app = builder.Build();
+app.MapDefaultEndpoints();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-
-app.UseAuthorization();
-
-app.MapControllers();
+app.NewVersionedApi("catalog")
+    .MapCatalogApiV1();
 
 app.Run();
