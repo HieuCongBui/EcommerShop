@@ -10,9 +10,12 @@ var withApiVersioning = builder.Services.AddApiVersioning();
 builder.AddDefaultOpenApi(withApiVersioning);
 
 var app = builder.Build();
+
 app.MapDefaultEndpoints();
 
 app.NewVersionedApi("catalog")
     .MapCatalogApiV1();
+
+app.UseDefaultOpenApi();
 
 app.Run();

@@ -8,7 +8,7 @@ namespace Catalog.API.Infrastructor.EntityConfigurations
         {
             builder.ToTable("Catalog");
 
-            builder.Property(ci => ci)
+            builder.Property(ci => ci.Name)
                 .HasMaxLength(50);
 
             builder.Property(ci => ci.Embedding)

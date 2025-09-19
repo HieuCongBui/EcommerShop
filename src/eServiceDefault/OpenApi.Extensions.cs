@@ -11,7 +11,7 @@ namespace eServiceDefault
 {
     public static partial class Extensions
     {
-        public static IApplicationBuilder AddOpenApiExtensions(this WebApplication app)
+        public static IApplicationBuilder UseDefaultOpenApi(this WebApplication app)
         {
             var configuration = app.Configuration;
             var openApiSection = configuration.GetSection("OpenApi");
@@ -85,8 +85,8 @@ namespace eServiceDefault
                 // the default format will just be ApiVersion.ToString(); for example, 1.0.
                 // this will format the version as "'v'major[.minor][-status]"
                 apiVersioning.AddApiExplorer(options => options.GroupNameFormat = "'v'VVV");
-                //services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
-                //services.AddSwaggerGen(options => options.OperationFilter<OpenApiDefaultValues>());
+                services.AddTransient<IConfigureOptions<SwaggerGenOptions>, ConfigureSwaggerOptions>();
+                services.AddSwaggerGen(options => options.OperationFilter<OpenApiDefaultValues>());
             }
 
             return builder;

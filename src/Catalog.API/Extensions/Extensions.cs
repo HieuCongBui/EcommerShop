@@ -9,5 +9,7 @@
                 builder.UseVector();
             });
         });
+
+        builder.Services.AddMigration<CatalogDbContext, CatalogDbSeeds>();
     }
 }
