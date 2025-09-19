@@ -5,22 +5,20 @@ using Microsoft.Extensions.Configuration;
 var builder = DistributedApplication.CreateBuilder(args);
 builder.AddForwardedHeaders();
 
-var postgres = builder.AddPostgres("postgres")
-    .WithImage("ankane/pgvector")
-    .WithImageTag("latest");
+//var postgres = builder.AddPostgres("postgres")
+//    .WithImage("ankane/pgvector")
+//    .WithImageTag("latest");
 
 
-var catalogDb = postgres.AddDatabase("catalogdb");
-var identityDb = postgres.AddDatabase("identitydb");
-var orderDb = postgres.AddDatabase("orderingdb");
+//var catalogDb = postgres.AddDatabase("catalogdb");
+//var identityDb = postgres.AddDatabase("identitydb");
+//var orderDb = postgres.AddDatabase("orderingdb");
 
 var launchProfileName = ShouldUseHttpForEndpoints() ? "http" : "https";
 
-var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api")
-    .WithReference(catalogDb);
+var catalogApi = builder.AddProject<Projects.Catalog_API>("catalog-api");
 
-var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api")
-    .WithReference(orderDb);
+var orderingApi = builder.AddProject<Projects.Ordering_API>("ordering-api");
 
 builder.Build().Run();
 

@@ -36,8 +36,8 @@ namespace Catalog.API.Models
         public int MaxStockThreshold { get; set; }
 
         /// <summary>Optional embedding for the catalog item's description.</summary>
-        [JsonIgnore]
-        public Vector Embedding { get; set; }
+        //[JsonIgnore]
+        //public Vector Embedding { get; set; }
 
         /// <summary>
         /// True if item is on reorder
