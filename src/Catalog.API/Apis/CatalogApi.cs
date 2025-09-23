@@ -9,7 +9,7 @@ namespace Catalog.API.Apis
         {
             var api = app.MapGroup("api/catalog").HasApiVersion(1.0);
 
-            app.MapGet("/items", GetAllItems);
+            api.MapGet("/items", GetAllItems);
             return app;
         }
         public static async Task<Results<Ok<PaginatedItems<CatalogItem>>, BadRequest<string>>> GetAllItems(
